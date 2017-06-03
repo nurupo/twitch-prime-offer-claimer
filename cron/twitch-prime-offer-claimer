@@ -1,0 +1,5 @@
+# This is needed for email reports
+CONTENT_TYPE='multipart/related; boundary="uUz_cCeh8ZzHgF4B5qvz2_WRszYFmr8jHI1gCLC1BxTNQs4Uagd_A_VgaMSPQxEp"'
+
+0 0 * * * root : Twitch Prime Offer Claimer ; /usr/bin/docker run --rm --name twitch-prime-offer-claimer -v /var/lib/twitch-prime-offer-claimer:/script twitch-prime-offer-claimer
+
