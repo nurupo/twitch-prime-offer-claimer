@@ -136,7 +136,7 @@ try:
       exit_with_error("Error: Couldn't find any descriptions in {} offer".format(heading))
 
     claim = None
-    for button in offer.find_elements_by_css_selector('button'):
+    for button in offer.find_elements_by_css_selector('.button'):
       # I hate to rely on the exact wording, but there doesn't seem to be a
       # better way of doing this, the button attributes are not distinctive
       # enough
@@ -153,6 +153,9 @@ try:
           time.sleep(0.2)
         code = copy_button.get_attribute('data-clipboard-text')
         claim = 'Code: {}'.format(code)
+      elif button.text == 'Learn More':
+        link = button.get_attribute('href')
+        claim = 'Visit: {}'.format(link)
     if claim == None:
       driver.quit()
       exit_with_error("Error: Couldn't claim the offer")
