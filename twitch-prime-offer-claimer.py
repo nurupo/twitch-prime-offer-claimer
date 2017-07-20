@@ -216,7 +216,7 @@ try:
         i = 0
         for offer in offers:
           if offer['image'] != None:
-            report += Config.EMAIL_BOUNDARY
+            report += '{}\n'.format(Config.EMAIL_BOUNDARY)
             report += 'Content-Type: image/png; name="{}.png"\n'.format(i)
             report += 'Content-Disposition: inline; filename="{}.png"\n'.format(i)
             report += 'Content-Transfer-Encoding: base64\n'
