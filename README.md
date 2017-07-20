@@ -36,7 +36,7 @@ cp Dockerfile /var/lib/twitch-prime-offer-claimer
 ```
 
 Provide values for the cookies in `/var/lib/twitch-prime-offer-claimer/cookies.py` file.
-The cookies should be updated periodically as they expire.
+The cookies should be updated periodically as they do expire.
 It's not known yet for how long they are valid, Twitch website doesn't set an explicit expiration date for them.
 
 Build Docker image
@@ -46,13 +46,14 @@ docker build -t twitch-prime-offer-claimer /var/lib/twitch-prime-offer-claimer/
 
 Setup cronjob
 ```
-cp cron/twitch-prime-offer-claimer /etc/cron.d/twitch-prime-offer-claimer
+cp etc/cron.d/twitch-prime-offer-claimer /etc/cron.d/twitch-prime-offer-claimer
 service cron reload
 ```
 
 That's it.
 Once a day, at midnight, cron would run the script in a Docker container, generating an html report of how successful (or unsuccessful) the script ran.
 By default, the report would be generated only if it differs from the last report, so you should receive reports only on changes.
+Also, by default, the html report would be in email format.
 It might be worth configuring cron to email the html report.
 
 # License

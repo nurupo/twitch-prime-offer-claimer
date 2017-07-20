@@ -1,5 +1,5 @@
 # Login into your Twitch account in a browser and fill in the values for these
-# cookies. Treat these values as if they wereyour Twitch username and password,
+# cookies. Treat these values as if they were your Twitch username and password,
 # because knowing them one can login into Twitch as you.
 COOKIES = [
 {

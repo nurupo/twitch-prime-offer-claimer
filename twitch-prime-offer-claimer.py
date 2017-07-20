@@ -37,11 +37,41 @@ from selenium.webdriver.common.keys import Keys
 import config as Config
 import cookies as Cookies
 
-HTML_ERROR_BEGIN = '<p style="color:red;"><b><u>'
-HTML_ERROR_END = '</u></b></p>'
+EMAIL_HTML_HEAD = '{}\n{}\n{}\n'.format(
+                           Config.EMAIL_BOUNDARY,
+                           'Content-Type: text/html; charset=utf-8',
+                           'Content-Transfer-Encoding: 8bit')
 
-def html_error(message):
-  return "{}{}{}".format(HTML_ERROR_BEGIN, message, HTML_ERROR_END)
+HTML_HEAD = '{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n'.format(
+                           '<!doctype html>',
+                           '<html>',
+                           '<head>',
+                           '<meta name="viewport" content="width=device-width" />',
+                           '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />',
+                           '<title>Twitch Prime Offer Claimer Report</title>',
+                           '</head>',
+                           '<body>')
+
+# Doesn't include the ending boundary since more sections might follow
+HTML_TAIL = '{}\n{}\n'.format(
+                           '</body>',
+                           '</html>')
+
+def exit_with_error(message):
+  if Config.GENERATE_REPORT:
+    if Config.REPORT_IN_EMAIL_FORMAT:
+      print(EMAIL_HTML_HEAD, file=sys.stderr)
+
+    print(HTML_HEAD, file=sys.stderr)
+    print('{}\n{}\n{}\n'.format('<p style="color:red;"><b>', message, '</b></p>'), file=sys.stderr)
+    print(HTML_TAIL, file=sys.stderr)
+
+    if Config.REPORT_IN_EMAIL_FORMAT:
+      print('{}--'.format(Config.EMAIL_BOUNDARY), file=sys.stderr)
+  else:
+    print(message, file=sys.stderr)
+
+  sys.exit(1)
 
 chrome_options = Options()
 chrome_options.add_argument('--headless')
@@ -52,8 +82,10 @@ chrome_options.binary_location = Config.CHROME_PATH
 
 driver = webdriver.Chrome(executable_path=Config.CHROMEDRIVER_PATH, chrome_options=chrome_options)
 try:
-  # Using cookies instead of authenticating with username/password through the login form because the login form has captcha
-  # Selenium requires getting a page before any cookies can be added. The About page seems to be rather low-traffic, so we use it
+  # Using cookies instead of authenticating with username/password through the
+  # login form because the login form has captcha.
+  # Selenium requires getting a page before any cookies can be added. The About
+  # page seems to be rather low-traffic, so we use it.
   driver.get('https://www.twitch.tv/p/about')
   driver.delete_all_cookies()
   for cookie in Cookies.COOKIES:
@@ -62,21 +94,20 @@ try:
   # Authenticate!
   driver.get('https://www.twitch.tv/')
 
-  # Make sure we sucessfully authenticated. There should be our username displayed
+  # Make sure we sucessfully authenticated. There should be our username
+  # displayed
   try:
     driver.find_element_by_css_selector('#user_display_name')
   except:
-    if Config.GENERATE_REPORT:
-      print(html_error("Error: Couldn't authenticate. Make sure your cookies didn't expire - update the cookies and try again."))
-    else:
-      print("Error: Couldn't authenticate. Make sure your cookies didn't expire - update the cookies and try again.")
     driver.quit()
-    sys.exit(1)
+    exit_with_error("Error: Couldn't authenticate. Make sure your cookies didn't expire -- update the cookies and try again.")
 
-  # Click on the Twitch Prime button to trigger JavaScript code to load offer information
+  # Click on the Twitch Prime button to trigger JavaScript code to load offer
+  # information
   driver.find_element_by_css_selector('button.top-nav__prime-link').send_keys(Keys.RETURN)
 
-  # Iterate over offers, collecting information about them and claiming the claimable ones
+  # Iterate over offers, collecting information about them and claiming the
+  # claimable ones
   offer_list = driver.find_element_by_css_selector('div.offer-list__container')
   offers = []
   for offer in offer_list.find_elements_by_css_selector('div.offer-item'):
@@ -84,115 +115,114 @@ try:
     try:
       heading = offer.find_element_by_css_selector('h4').text
     except:
-      heading = html_error("Error: Couldn't find any headings")
+      driver.quit()
+      exit_with_error("Error: Couldn't find any headings in an offer")
 
     image = None
     try:
       image = offer.find_element_by_css_selector('figure.offer-item__img').find_element_by_css_selector('img').get_attribute('src')
     except:
       pass
+    if image == None:
+      driver.quit()
+      exit_with_error("Error: Couldn't find an image in {} offer".format(heading))
 
     descriptions = []
     for description in offer.find_elements_by_css_selector('p:not(.hint)'):
       if len(description.get_attribute('innerHTML')) > 0:
         descriptions.append(description.get_attribute('innerHTML'))
     if len(descriptions) == 0:
-      headings.append(html_error("Error: Couldn't find any descriptions"))
+      driver.quit()
+      exit_with_error("Error: Couldn't find any descriptions in {} offer".format(heading))
 
     claim = None
     for button in offer.find_elements_by_css_selector('button'):
-      # I hate to rely on the exact wording, but there doesn't seem to be a better way of doing this, the button attributes are not distinctive enough
+      # I hate to rely on the exact wording, but there doesn't seem to be a
+      # better way of doing this, the button attributes are not distinctive
+      # enough
       if button.text == 'Claim Offer':
         button.send_keys(Keys.RETURN)
         claim = 'The offer was claimed'
       elif button.text == 'Get Code':
         button.send_keys(Keys.RETURN)
         copy_button = offer.find_element_by_css_selector('button.copy-btn')
-        # The data-clipboard-text attribute seems to appear only after some time passes, it's likely set by JavaScript triggered by clicking on the button
+        # The data-clipboard-text attribute seems to appear only after some
+        # time passes, likely set by JavaScript triggered by clicking on the
+        # button
         while copy_button.get_attribute('data-clipboard-text') == None:
           time.sleep(0.2)
         code = copy_button.get_attribute('data-clipboard-text')
         claim = 'Code: {}'.format(code)
     if claim == None:
-      headings.append(html_error("Error: Couldn't claim the offer"))
+      driver.quit()
+      exit_with_error("Error: Couldn't claim the offer")
 
     offers.append({'heading':heading, 'image':image, 'descriptions':descriptions, 'claim':claim})
 
   driver.quit()
-except:
-  driver.quit()
+except SystemExit:
   raise
+except Exception as e:
+  driver.quit()
+  exit_with_error('Error:\n{}'.format(str(e)))
 
-# Don't produce a report if it's no different from the last report
-if Config.GENERATE_REPORT_ONLY_ON_CHANGE:
-  sha256 = hashlib.sha256(json.dumps(offers, sort_keys=True).encode('utf-8')).hexdigest()
-  try:
+try:
+  # Don't produce a report if it's no different from the last report
+  if Config.GENERATE_REPORT and Config.GENERATE_REPORT_ONLY_ON_CHANGE:
+    sha256 = hashlib.sha256(json.dumps(offers, sort_keys=True).encode('utf-8')).hexdigest()
     hash_file = open('hash.sha256', 'r')
     read_hash = hash_file.read()
     hash_file.close()
     if sha256 == read_hash:
       sys.exit(0)
-  except SystemExit:
-    raise
-  except:
-    pass
 
-  with open('hash.sha256', 'w+') as hash_file:
-    hash_file.write(sha256)
+    with open('hash.sha256', 'w+') as hash_file:
+      hash_file.write(sha256)
 
-# Generate a html report, either as a regular html page or as an email.
-# The difference is that for email we generate email headers and print images differently, because for god knows
-# what reason, inlining base64 images in <img> tag is not allowed in emails, you have to jump through the hoops
-# of creating a multipart email, with each image being a separate part, and referencing images in your html text
-# using content ids. This is madness.
-if Config.GENERATE_REPORT:
-  if Config.REPORT_IN_EMAIL_FORMAT:
-    print('This is a multi-part message in MIME format.')
-    print(Config.EMAIL_BOUNDARY)
-    print('Content-Type: text/html; charset=utf-8')
-    print('Content-Transfer-Encoding: 8bit')
-    print('')
-  print('<!doctype html>')
-  print('<html>')
-  print('<head>')
-  print('<meta name="viewport" content="width=device-width" />')
-  print('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />')
-  print('<title>Twitch Prime Offer Claimer Report</title>')
-  print('</head>')
-  print('<body>')
-  print('<h1>Twitch Prime Offer Claimer Report</h1>')
-  i = 0
-  for offer in offers:
-    print('<h2>{}</h2>'.format(offer['heading']))
-    if Config.INCLUDE_IMAGES_IN_REPORT:
-      if offer['image'] != None:
+  # Generate a html report, either as a regular html page or as an email.
+  # The difference is that for email we generate email headers and print images
+  # differently, because for god knows what reason, inlining base64 images in
+  # <img> tag is not allowed in emails, you have to jump through the hoops of
+  # creating a multipart email, with each image being a separate part, and
+  # referencing images in your html text using content ids. This is madness.
+  if Config.GENERATE_REPORT:
+    report = ''
+    if Config.REPORT_IN_EMAIL_FORMAT:
+      report += '{}\n'.format(EMAIL_HTML_HEAD)
+    report += HTML_HEAD
+    report += '<h1>Twitch Prime Offer Claimer Report</h1>\n'
+    i = 0
+    for offer in offers:
+      report += '<h2>{}</h2>\n'.format(offer['heading'])
+      if Config.INCLUDE_IMAGES_IN_REPORT:
         if Config.REPORT_IN_EMAIL_FORMAT:
-          print('<img src="cid:{}">'.format(i))
+          report += '<img src="cid:{}">\n'.format(i)
         else:
-          print('<img src="data:image/png;base64, {}" />'.format(base64.b64encode(requests.get(offer['image']).content).decode('ascii')))
-      else:
-        print(html_error("Error: couldn't get the offer image"))
-    print('<h3>Claim</h3>')
-    print(offer['claim'])
-    print('<h3>Description</h3>')
-    for description in offer['descriptions']:
-      print('<p>{}</p>'.format(description))
-    i = i + 1
-  print('</body>')
-  print('</html>')
-  if Config.REPORT_IN_EMAIL_FORMAT:
-    print('')
-    if Config.INCLUDE_IMAGES_IN_REPORT:
-      i = 0
-      for offer in offers:
-        if offer['image'] != None:
-          print(Config.EMAIL_BOUNDARY)
-          print('Content-Type: image/png; name="{}.png"'.format(i))
-          print('Content-Disposition: inline; filename="{}.png"'.format(i))
-          print('Content-Transfer-Encoding: base64')
-          print('Content-ID: <{}>'.format(i))
-          print('')
-          print(base64.b64encode(requests.get(offer['image']).content).decode('ascii'))
-          print('')
-        i = i + 1
-      print('{}--'.format(Config.EMAIL_BOUNDARY))
+          report += '<img src="data:image/png;base64, {}" />\n'.format(base64.b64encode(requests.get(offer['image']).content).decode('ascii'))
+      report += '<h3>Claim</h3>\n'
+      report += '{}\n'.format(offer['claim'])
+      report += '<h3>Description</h3>\n'
+      for description in offer['descriptions']:
+        report += '<p>{}</p>\n'.format(description)
+      i = i + 1
+    report += HTML_TAIL
+    if Config.REPORT_IN_EMAIL_FORMAT:
+      if Config.INCLUDE_IMAGES_IN_REPORT:
+        i = 0
+        for offer in offers:
+          if offer['image'] != None:
+            report += Config.EMAIL_BOUNDARY
+            report += 'Content-Type: image/png; name="{}.png"\n'.format(i)
+            report += 'Content-Disposition: inline; filename="{}.png"\n'.format(i)
+            report += 'Content-Transfer-Encoding: base64\n'
+            report += 'Content-ID: <{}>\n'.format(i)
+            report += '\n'
+            report += base64.b64encode(requests.get(offer['image']).content).decode('ascii')
+            report += '\n'
+          i = i + 1
+      report += '{}--'.format(Config.EMAIL_BOUNDARY)
+    print(report)
+except SystemExit:
+  raise
+except Exception as e:
+  exit_with_error('Error:\n{}'.format(str(e)))
