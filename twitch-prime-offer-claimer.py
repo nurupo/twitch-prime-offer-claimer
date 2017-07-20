@@ -170,11 +170,16 @@ try:
   # Don't produce a report if it's no different from the last report
   if Config.GENERATE_REPORT and Config.GENERATE_REPORT_ONLY_ON_CHANGE:
     sha256 = hashlib.sha256(json.dumps(offers, sort_keys=True).encode('utf-8')).hexdigest()
-    hash_file = open('hash.sha256', 'r')
-    read_hash = hash_file.read()
-    hash_file.close()
-    if sha256 == read_hash:
-      sys.exit(0)
+    try:
+      hash_file = open('hash.sha256', 'r')
+      read_hash = hash_file.read()
+      hash_file.close()
+      if sha256 == read_hash:
+        sys.exit(0)
+    except SystemExit:
+      raise
+    except:
+      pass
 
     with open('hash.sha256', 'w+') as hash_file:
       hash_file.write(sha256)
