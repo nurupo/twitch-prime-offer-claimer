@@ -82,25 +82,39 @@ chrome_options.binary_location = Config.CHROME_PATH
 
 driver = webdriver.Chrome(executable_path=Config.CHROMEDRIVER_PATH, chrome_options=chrome_options)
 try:
-  # Using cookies instead of authenticating with username/password through the
-  # login form because the login form has captcha.
-  # Selenium requires getting a page before any cookies can be added. The About
-  # page seems to be rather low-traffic, so we use it.
-  driver.get('https://www.twitch.tv/p/about')
-  driver.delete_all_cookies()
-  for cookie in Cookies.COOKIES:
-    driver.add_cookie(cookie)
+  authentication_tries = 0
+  authenticated = False
+  while not authenticated:
+    try:
+      authentication_tries += 1
 
-  # Authenticate!
-  driver.get('https://www.twitch.tv/')
+      # Using cookies instead of authenticating with username/password through the
+      # login form because the login form has captcha.
+      # Selenium requires getting a page before any cookies can be added. The About
+      # page seems to be rather low-traffic, so we use it.
+      driver.get('https://www.twitch.tv/p/about')
+      driver.delete_all_cookies()
+      for cookie in Cookies.COOKIES:
+        driver.add_cookie(cookie)
 
-  # Make sure we sucessfully authenticated. There should be our username
-  # displayed
-  try:
-    driver.find_element_by_css_selector('#user_display_name')
-  except:
-    driver.quit()
-    exit_with_error("Error: Couldn't authenticate. Make sure your cookies didn't expire -- update the cookies and try again.")
+      # Authenticate!
+      driver.get('https://www.twitch.tv/')
+
+      # Make sure we sucessfully authenticated. There should be our username
+      # displayed
+      try:
+        driver.find_element_by_css_selector('#user_display_name')
+        authenticated = True
+      except:
+        if authentication_tries < Config.MAX_AUTHENTICATION_TRIES:
+          continue
+        driver.quit()
+        exit_with_error("Error: Couldn't authenticate. Make sure your cookies didn't expire -- update the cookies and try again.")
+    except:
+      if authentication_tries < Config.MAX_AUTHENTICATION_TRIES:
+        continue
+      else:
+        raise
 
   # Click on the Twitch Prime button to trigger JavaScript code to load offer
   # information

@@ -7,6 +7,11 @@ CHROMEDRIVER_PATH = '/usr/local/bin/chromedriver'
 # doesn't work in Docker without it.
 CHROME_EXTRA_ARGS = ['--no-sandbox']
 
+# How many times should we try to authenticate before giving up.
+# For some reason trying just 1 tends to fail as of lately, even though it
+# worked perfectly before. Perhaps Twitch does A/B testing of their new design.
+MAX_AUTHENTICATION_TRIES=5
+
 # Write a html report to stdout.
 GENERATE_REPORT = True
 
