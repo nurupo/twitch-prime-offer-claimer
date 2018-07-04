@@ -1,3 +1,10 @@
+# PROJECT DISCONTINUED
+Unfortunetly I have lost the interest in the project after the October 2017 Twitch website redesign, which would require me to rewrite most of the code and at which point I was frequenting Twitch enough as not to need this script anymore.
+The project was written mostly for myself and it had 0 stars on GitHub for over a year, so since I don't need it anymore and no one else seems to be using it, it doesn't make sense to support it.
+If it turns out that more people are interested in this project than I have thought, I might bring the project back.
+
+The script doesn't work against the current Twitch website, it's coded against the website before the October 2017 redesign.
+
 # Twitch Prime Offer Claimer
 A script that claims Twitch Prime offers. Cron it and you won't miss on any Twitch Prime offers.
 
